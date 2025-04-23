@@ -1,6 +1,7 @@
 using Application.Features.Auth.Commands;
 using Application.Interfaces;
 using Domain.Entities;
+using Infrastructure.Models;
 using Infrastructure.Persistence;
 using Infrastructure.Services;
 using MediatR;
@@ -44,6 +45,18 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 // Add DbContext for PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -51,7 +64,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Add Redis
 builder.Services.AddStackExchangeRedisCache(options =>
 {
-    options.Configuration = "localhost:6379";
+    var redisConnection = builder.Configuration.GetConnectionString("Redis");
+    if (string.IsNullOrEmpty(redisConnection))
+    {
+        throw new InvalidOperationException("Redis connection string is not configured.");
+    }
+    options.Configuration = redisConnection;
     options.InstanceName = "AuthApi_";
 });
 
@@ -71,7 +89,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// Add MediatR and Dependencies
+// Add Services
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<IOtpService, OtpService>();
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+builder.Services.AddHostedService<EmailConsumerService>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(RegisterCommand).Assembly));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IRepository<User>, UserRepository>();
@@ -87,6 +110,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+app.UseCors("AllowFrontend");
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
