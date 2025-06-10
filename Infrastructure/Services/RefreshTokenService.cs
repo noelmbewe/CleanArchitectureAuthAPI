@@ -16,22 +16,26 @@ public class RefreshTokenService : IRefreshTokenService
     public string GenerateRefreshToken()
     {
         var randomNumber = new byte[32];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomNumber);
-        return Convert.ToBase64String(randomNumber);
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
+        }
     }
 
     public async Task StoreRefreshTokenAsync(string userId, string refreshToken)
     {
-        var options = new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(7)
-        };
-        await _cache.SetStringAsync($"refresh_token:{userId}", refreshToken, options);
+        await _cache.SetStringAsync(
+            $"refreshToken_{userId}",
+            refreshToken,
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(7)
+            });
     }
 
     public async Task<string?> GetRefreshTokenAsync(string userId)
     {
-        return await _cache.GetStringAsync($"refresh_token:{userId}");
+        return await _cache.GetStringAsync($"refreshToken_{userId}");
     }
 }

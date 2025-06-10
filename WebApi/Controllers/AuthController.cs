@@ -31,6 +31,7 @@ public class AuthController : ControllerBase
         return Ok(new { Status = "Success", Message = result });
     }
 
+
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginQuery query)
     {
@@ -48,6 +49,21 @@ public class AuthController : ControllerBase
     [HttpPost("resend-otp")]
     public async Task<IActionResult> ResendOtp([FromBody] ResendOtpCommand command)
     {
+        var result = await _mediator.Send(command);
+        return Ok(new { Status = "Success", Message = result });
+    }
+
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] LogoutCommand command)
+    {
+        var id = User.Claims.FirstOrDefault(c => c.Type == "id")?.Value;
+        if (string.IsNullOrEmpty(id))
+        {
+            return Unauthorized("User ID not found in token.");
+        }
+
+        command.Id = id;
         var result = await _mediator.Send(command);
         return Ok(new { Status = "Success", Message = result });
     }
